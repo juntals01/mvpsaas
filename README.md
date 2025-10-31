@@ -1,7 +1,11 @@
-# 🧱 MVP SaaS — Stable Release (Clerk Auth)
+# 🧱 MVP SaaS — Full-Stack Boilerplate for Modern SaaS Apps
 
-A full-stack **Turborepo** combining **Next.js**, **NestJS**, **Tailwind CSS v4**, **shadcn/ui**, and **Clerk Authentication** for modern SaaS and web app development.  
-This version is marked as the **latest stable release**.
+A production-ready Turborepo boilerplate for building scalable SaaS platforms with Next.js, NestJS, Tailwind CSS v4, shadcn/ui, and Clerk authentication.  
+Designed for local development with Docker — ideal for developers creating SaaS products using Next.js, NestJS, and PostgreSQL.
+
+> ⚠️ **Important Note:**  
+> Before running the app, make sure to **add your subscription plans in [Clerk Dashboard → Billing](https://dashboard.clerk.com/)**.  
+> This ensures your pricing and plan management features work correctly during local and production development.
 
 ---
 
