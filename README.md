@@ -1,150 +1,111 @@
-# MVP Base — Stable Release
+# 🧱 MVP SaaS — Stable Release (Clerk Auth)
 
-A full-stack **Turborepo** combining **Next.js**, **NestJS**, **Tailwind CSS v4**, **shadcn/ui**, and **Firebase** for modern web app development.  
+A full-stack **Turborepo** combining **Next.js**, **NestJS**, **Tailwind CSS v4**, **shadcn/ui**, and **Clerk Authentication** for modern SaaS and web app development.  
 This version is marked as the **latest stable release**.
 
 ---
 
 ## 🚀 Tech Stack
 
-**Frontend**
+### Frontend
 
-- Next.js 14 (App Router)
+- Next.js 15 (App Router)
 - Tailwind CSS v4
 - shadcn/ui + Radix UI
+- Clerk Auth (User Management)
 - TypeScript
 
-**Backend**
+### Backend
 
-- NestJS (GraphQL-ready)
-- TypeORM or Prisma (flexible)
-- Redis / PostgreSQL (optional)
-- Firebase Emulator (Auth & Firestore)
+- NestJS
+- TypeORM + PostgreSQL
+- Redis
+- JWT verification via Clerk
 
-**Tooling**
+### Tooling
 
 - Turborepo (monorepo manager)
 - ESLint + Prettier (shared configs)
 - Sonner + Lucide Icons
-- Docker-ready for local dev
+- Docker Compose (Postgres, Redis, MinIO)
+- Environment shared via root `.env`
 
 ---
 
-## 📁 Project Structure
+## ⚙️ Installation & Setup
 
-mvpbase/
-│
-├── apps/
-│ ├── api/ # NestJS backend
-│ └── web/ # Next.js frontend (Tailwind v4 + shadcn/ui)
-│
-├── common/ # Shared configs (eslint, tsconfig, graphql)
-├── package.json
-├── turbo.json
-├── .env
-└── README.md
+### Download the Repository
 
-> Root `.env` is shared between both apps.  
-> Workspaces are defined in package.json as `"workspaces": ["apps/*"]`.
+```bash
+git clone https://github.com/juntals01/mvpbase.git
+cd mvpbase
 
----
+cp .env.example .env
+```
 
-## ⚙️ Setup & Commands
+#### Replace clerk keys
 
-### Install Dependencies
+CLERK_PUBLISHABLE_KEY and NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY should be the same
 
-npm install
+https://clerk.com/docs/getting-started/quickstart/pages-router
 
-### Run Both Apps
+```bash
+# ==============================
+# ⚙️ Clerk
+# ==============================
 
+CLERK_SECRET_KEY=sk_test_
+
+# Clerk (backend)
+CLERK_PUBLISHABLE_KEY=pk_test_
+
+# Clerk (frontend)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_
+```
+
+### Install Docker
+
+If you don’t have Docker yet:
+
+macOS: https://docs.docker.com/desktop/setup/install/mac-install/
+
+Windows: https://docs.docker.com/desktop/setup/install/windows-install/
+
+Linux: https://docs.docker.com/desktop/setup/install/linux/
+
+### Start Infrastructure
+
+The stack includes PostgreSQL, Redis, and MinIO.
+
+```bash
+npm run docker:up
+```
+
+### Check container status:
+
+```bash
+npm run docker:ps
+```
+
+### Tail logs:
+
+```bash
+npm run docker:logs
+```
+
+### Run Database Migrations
+
+Make sure the API is built first:
+
+```bash
+npm run -w apps/api build
+npm run -w apps/api migration:run
+```
+
+### Start the Apps
+
+Run both the API and Web apps in parallel:
+
+```bash
 npm run dev
-
-### Run Only One App
-
-# API (NestJS)
-
-npm run dev -w apps/api
-
-# Web (Next.js)
-
-npm run dev -w apps/web
-
-### Clean Turbo Cache
-
-npx turbo clean
-
-### Add Packages
-
-# API only
-
-npm install -w apps/api <package-name>
-
-npm run -w apps/api seed:admin -- --email=admin@example.com --name="Admin User"
-
-# Web only
-
-npm install -w apps/web <package-name>
-
----
-
-## 🔥 Firebase (Emulator Ready)
-
-The repo supports local Firebase auth and Firestore emulators via Docker:
-
-services:
-firebase:
-image: andreysenov/firebase-tools
-container_name: mvpbase-firebase
-restart: no
-ports: - "4000:4000" # Emulator UI - "9099:9099" # Auth Emulator
-
-Access at:  
-👉 http://localhost:4000
-
-Keep your config file:
-firebase/firebase.json
-
----
-
-## 🌈 UI Stack (shadcn)
-
-Installed via:
-npx shadcn@latest init
-
-Common components:
-
-- @/components/ui/button
-- @/components/ui/card
-- @/components/ui/sonner (toast)
-- @/components/ui/avatar
-- @/components/ui/input
-
----
-
-## 🧩 Stable Release Workflow
-
-1. Commit your changes  
-   git add .
-   git commit -m "chore: prepare stable release"
-
-2. Tag the stable version  
-   git tag -a v1.0.0 -m "Stable Release v1.0.0"
-   git push origin v1.0.0
-
-3. Create a GitHub Release
-   - Go to **GitHub → Releases → Draft a new release**
-   - Tag: `v1.0.0`
-   - Title: `Stable Release v1.0.0`
-   - Description: Add changelog or features
-   - Click **Publish Release**
-
-Now your latest commit is publicly marked as **Stable** — like other software releases.
-
----
-
-## 🧠 Author
-
-**Norberto Libago**  
-Full-stack Developer — Next.js | NestJS | Firebase | Tailwind  
-🌐 https://www.linkedin.com/in/norberto-libago-66641b99/  
-💻 https://github.com/juntals01
+```
