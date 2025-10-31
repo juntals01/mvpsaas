@@ -9,69 +9,75 @@ import { NextResponse } from 'next/server';
 const isDashboard = createRouteMatcher(['/dashboard(.*)']);
 const isAdmin = createRouteMatcher(['/admin(.*)']);
 
+type Claims = {
+  metadata?: { role?: unknown };
+  role?: unknown;
+};
+
+function roleFromClaims(sessionClaims: unknown): string | undefined {
+  const claims = (sessionClaims ?? null) as Claims | null;
+  const candidate = claims?.metadata?.role ?? claims?.role;
+  return typeof candidate === 'string' ? candidate : undefined;
+}
+
 export default clerkMiddleware(async (auth, req) => {
-  // Only guard routes that need it
+  // Admin area — require auth + admin role
   if (isAdmin(req)) {
-    // must be signed in
     await auth.protect();
     const { userId, sessionClaims } = await auth();
 
-    // role from JWT (if you added the JWT template) or fallback to Clerk API
-    let role: string | undefined =
-      (sessionClaims as any)?.metadata?.role ?? (sessionClaims as any)?.role;
+    let role = roleFromClaims(sessionClaims);
 
     if (!role && userId) {
       try {
-        const client = await clerkClient(); // function-style in your SDK
+        const client = await clerkClient();
         const user = await client.users.getUser(userId);
-        role = (user.publicMetadata as Record<string, unknown>)?.role as
-          | string
-          | undefined;
+        const pm = user.publicMetadata as Record<string, unknown> | null;
+        const maybeRole = pm?.role;
+        if (typeof maybeRole === 'string') role = maybeRole;
       } catch {
-        /* ignore */
+        // ignore; role stays undefined
       }
     }
 
     if (role !== 'admin') {
       return NextResponse.redirect(new URL('/', req.url));
     }
-    return; // allow admin
+    return NextResponse.next();
   }
 
+  // Dashboard — require auth; if admin, redirect to /admin
   if (isDashboard(req)) {
-    // must be signed in
     await auth.protect();
     const { userId, sessionClaims } = await auth();
 
-    // same role resolution
-    let role: string | undefined =
-      (sessionClaims as any)?.metadata?.role ?? (sessionClaims as any)?.role;
+    let role = roleFromClaims(sessionClaims);
 
     if (!role && userId) {
       try {
         const client = await clerkClient();
         const user = await client.users.getUser(userId);
-        role = (user.publicMetadata as Record<string, unknown>)?.role as
-          | string
-          | undefined;
+        const pm = user.publicMetadata as Record<string, unknown> | null;
+        const maybeRole = pm?.role;
+        if (typeof maybeRole === 'string') role = maybeRole;
       } catch {
-        /* ignore */
+        // ignore
       }
     }
 
-    // admins shouldn't see /dashboard → send them to /admin
     if (role === 'admin') {
       return NextResponse.redirect(new URL('/admin', req.url));
     }
-    return; // allow non-admin
+    return NextResponse.next();
   }
 
-  // All other routes are public; do nothing.
+  // Public routes — do nothing
+  return NextResponse.next();
 });
 
 export const config = {
   matcher: [
-    // keep default matcher; we only act on /admin and /dashboard so no loops on /sign-in
+    // Act on pages & API routes; ignore static assets
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     '/(api|trpc)(.*)',
   ],

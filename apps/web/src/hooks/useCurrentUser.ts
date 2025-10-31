@@ -1,9 +1,10 @@
-// apps/web/src/hooks/useCurrentUser.ts
 'use client';
 
 import { User } from '@/interfaces/api/user.interface';
 import { useEffect, useState } from 'react';
 import { useApi } from './useApi';
+
+type MeResponse = { ok: boolean; user: User };
 
 export function useCurrentUser() {
   const { get } = useApi();
@@ -14,13 +15,24 @@ export function useCurrentUser() {
   useEffect(() => {
     let active = true;
 
+    const getErrorMessage = (err: unknown): string => {
+      if (err && typeof err === 'object') {
+        const maybeResp = (
+          err as { response?: { data?: { message?: unknown } } }
+        ).response;
+        const msg = maybeResp?.data?.message;
+        if (typeof msg === 'string') return msg;
+      }
+      if (err instanceof Error) return err.message;
+      return 'Failed to fetch user';
+    };
+
     const fetchUser = async () => {
       try {
-        const res = await get<{ ok: boolean; user: User }>('/users/me');
+        const res = await get<MeResponse>('/users/me');
         if (active && res.ok) setUser(res.user);
-      } catch (err: any) {
-        if (active)
-          setError(err?.response?.data?.message || 'Failed to fetch user');
+      } catch (err: unknown) {
+        if (active) setError(getErrorMessage(err));
       } finally {
         if (active) setLoading(false);
       }
