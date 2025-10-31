@@ -45,6 +45,14 @@ export function Header() {
           </SignedOut>
 
           <SignedIn>
+            <Link href='/dashboard'>
+              <Button
+                variant='ghost'
+                className='text-sm font-medium text-gray-700 hover:text-[#6c47ff]'
+              >
+                Dashboard
+              </Button>
+            </Link>
             <UserButton afterSignOutUrl='/' />
           </SignedIn>
         </div>
