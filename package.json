@@ -1,0 +1,41 @@
+{
+  "name": "MVP Saas",
+  "private": true,
+  "scripts": {
+    "dev": "npm run docker:up && turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "check-types": "turbo run check-types",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,md,json}\"",
+    "clean": "npx turbo clean && rm -rf node_modules .turbo",
+    "docker:up": "docker compose --env-file .env up -d",
+    "docker:down": "docker compose --env-file .env down",
+    "docker:restart": "docker compose --env-file .env down && docker compose --env-file .env up -d",
+    "docker:build": "docker compose --env-file .env build",
+    "docker:rebuild": "docker compose --env-file .env build --no-cache",
+    "docker:reset": "docker compose --env-file .env down -v && docker compose --env-file .env up -d",
+    "docker:ps": "docker compose --env-file .env ps",
+    "docker:logs": "docker compose --env-file .env logs -f",
+    "db:psql": "PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c 'select 1;'"
+  },
+  "peerDependencies": {
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "dotenv-cli": "^10.0.0",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.8",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
