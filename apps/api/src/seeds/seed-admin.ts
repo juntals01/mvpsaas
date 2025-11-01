@@ -1,7 +1,33 @@
 // apps/api/src/seeds/seed-admin.ts
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
 import * as path from 'path';
-dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+
+// ---- ENV LOADER: dev uses .env if present; prod relies on injected env ----
+(function loadEnv() {
+  const isManaged = !!(
+    process.env.RAILWAY_ENVIRONMENT ||
+    process.env.RAILWAY_STATIC_URL ||
+    process.env.RENDER ||
+    process.env.VERCEL
+  );
+  if (isManaged || process.env.NODE_ENV === 'production') {
+    dotenv.config(); // harmless if no file
+    return;
+  }
+  const candidates = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '../../.env'),
+    path.resolve(__dirname, '../../../../.env'),
+    path.resolve(__dirname, '../../../../../.env'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      dotenv.config({ path: p });
+      break;
+    }
+  }
+})();
 
 import { clerkClient } from '@clerk/clerk-sdk-node';
 import { Logger } from '@nestjs/common';
@@ -14,6 +40,10 @@ const logger = new Logger('SeedAdmin');
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
 const ADMIN_NAME = process.env.ADMIN_NAME || 'Admin User';
 const ADMIN_IMAGE_URL = process.env.ADMIN_IMAGE_URL || '';
+const RESET_INTERVAL_MINUTES = Number(process.env.RESET_INTERVAL_MINUTES || 15);
+
+// Always rotate password (you can gate with env if you want)
+const ALWAYS_ROTATE_PASSWORD = true;
 
 /** Generate a strong random password */
 function generateStrongPassword(len = 28) {
@@ -38,45 +68,55 @@ function generateStrongPassword(len = 28) {
   return arr.join('');
 }
 
-async function ensureClerkUser() {
+/** Create or update the Clerk admin user; always returns the active password */
+async function ensureClerkUserAndPassword(): Promise<{
+  clerkId: string;
+  password: string;
+}> {
   if (!process.env.CLERK_SECRET_KEY) {
     throw new Error('CLERK_SECRET_KEY is required to run this seeder.');
   }
 
+  // Find by email
   const list = await clerkClient.users.getUserList({
     emailAddress: [ADMIN_EMAIL],
   });
   const existing = Array.isArray(list) ? list[0] : undefined;
 
-  const [firstName, ...rest] = ADMIN_NAME.split(' ').filter(Boolean);
-  const lastName = rest.join(' ') || undefined;
+  const [firstName, ...restName] = ADMIN_NAME.split(' ').filter(Boolean);
+  const lastName = restName.join(' ') || undefined;
 
-  if (existing) {
-    await clerkClient.users.updateUser(existing.id, {
-      ...(firstName ? { firstName } : {}),
-      ...(lastName ? { lastName } : {}),
-      ...(ADMIN_IMAGE_URL ? { imageUrl: ADMIN_IMAGE_URL } : {}),
-      publicMetadata: { ...(existing.publicMetadata || {}), role: 'admin' },
-    });
-    logger.log(`Existing admin found → Clerk ID: ${existing.id}`);
-    return { user: existing, password: null as string | null };
-  }
-
-  const password = generateStrongPassword();
-
-  const created = await clerkClient.users.createUser({
-    emailAddress: [ADMIN_EMAIL],
-    password,
+  // Helper to set profile fields (no-op for missing)
+  const baseProfile: Record<string, unknown> = {
     ...(firstName ? { firstName } : {}),
     ...(lastName ? { lastName } : {}),
     ...(ADMIN_IMAGE_URL ? { imageUrl: ADMIN_IMAGE_URL } : {}),
     publicMetadata: { role: 'admin' },
-  });
+  };
+
+  // Always set a fresh strong password
+  const password = generateStrongPassword();
+
+  if (existing) {
+    // Update profile + rotate password
+    await clerkClient.users.updateUser(existing.id, {
+      ...baseProfile,
+      password, // server API can set a new password
+    } as any);
+
+    logger.log(`Existing admin updated → Clerk ID: ${existing.id}`);
+    return { clerkId: existing.id, password };
+  }
+
+  // Create new user
+  const created = await clerkClient.users.createUser({
+    emailAddress: [ADMIN_EMAIL],
+    password,
+    ...baseProfile,
+  } as any);
 
   logger.warn('A new admin user has been created in Clerk.');
-  logger.warn(`Email: ${ADMIN_EMAIL}`);
-  logger.warn(`Temporary Password: ${password}`);
-  return { user: created, password };
+  return { clerkId: created.id, password };
 }
 
 async function ensureDbUser(clerkId: string) {
@@ -115,19 +155,26 @@ async function ensureDbUser(clerkId: string) {
     logger.log(`Email: ${ADMIN_EMAIL}`);
     logger.log(`Name : ${ADMIN_NAME}`);
 
-    const { user: clerkUser, password } = await ensureClerkUser();
-    const dbUser = await ensureDbUser(clerkUser.id);
+    const { clerkId, password } = await ensureClerkUserAndPassword();
+    const dbUser = await ensureDbUser(clerkId);
 
-    logger.log(`✅ Clerk user: ${clerkUser.id}`);
+    logger.log(`✅ Clerk user: ${clerkId}`);
     logger.log(`✅ DB user   : ${dbUser.id} (role: ${dbUser.role})`);
-    if (password)
-      logger.warn(`⚠️  Save this admin password securely: ${password}`);
+
+    // Always show the current password (you can gate on NODE_ENV if needed)
+    logger.warn(`⚠️  Admin password rotated. Save securely: ${password}`);
+
+    // Optional: set/reset your countdown marks server-side after seeding (if desired)
+    // e.g., write to your system_state table or call your /system/reset/mark with interval = RESET_INTERVAL_MINUTES
   } catch (err) {
     logger.error('❌ Seed failed', err);
+    process.exitCode = 1;
   } finally {
-    if (dataSource.isInitialized) {
-      await dataSource.destroy();
-    }
-    process.exit(0);
+    try {
+      if (dataSource.isInitialized) {
+        await dataSource.destroy();
+      }
+    } catch {}
+    process.exit();
   }
 })();
