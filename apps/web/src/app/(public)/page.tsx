@@ -1,8 +1,30 @@
-'use client';
-
+import { ResetCountdown } from '@/components/ResetCountdownSSR';
 import { PricingTable } from '@clerk/nextjs';
 
-export default function Page() {
+export default async function Page() {
+  const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  console.log('api', api);
+  let status: { nextResetAt?: string | null; intervalMinutes?: number } = {
+    nextResetAt: null,
+    intervalMinutes: 15,
+  };
+
+  try {
+    const res = await fetch(`${api}/system/reset/status`, {
+      cache: 'no-store',
+      // ensures no ISR cache in app router
+      next: { revalidate: 0 },
+    });
+    if (res.ok) status = await res.json();
+  } catch {
+    // keep defaults if API is unreachable during SSR
+  }
+
+  const snapshotNow = Date.now();
+
+  console.log('status', status);
+
   return (
     <main className='min-h-screen bg-background text-foreground'>
       <section className='mx-auto max-w-6xl px-6 pt-16 pb-8 text-center'>
@@ -17,18 +39,22 @@ export default function Page() {
         </p>
       </section>
 
+      <ResetCountdown
+        initial={{
+          nextResetAt: status.nextResetAt ?? null,
+          intervalMinutes: status.intervalMinutes ?? 15,
+          now: snapshotNow,
+        }}
+      />
+
       <section className='mx-auto max-w-6xl px-6 pb-20'>
         <div className='rounded-2xl border bg-card p-4 sm:p-6 shadow-sm'>
           <PricingTable
             appearance={{
-              variables: {
-                colorBackground: 'white',
-                colorText: 'black',
-              },
+              variables: { colorBackground: 'white', colorText: 'black' },
             }}
           />
         </div>
-
         <p className='mt-6 text-center text-xs text-muted-foreground'>
           Subscriptions are managed in your profile. Change or cancel anytime.
         </p>

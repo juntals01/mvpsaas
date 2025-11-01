@@ -24,7 +24,10 @@
     "migration:revert": "npm run typeorm -- migration:revert",
     "migration:show": "npm run typeorm -- migration:show",
     "db:reset": "npm run migration:revert -- --all || true && npm run migration:run",
-    "seed:admin": "ts-node -r tsconfig-paths/register -r dotenv/config src/seeds/seed-admin.ts"
+    "seed:admin": "ts-node -r tsconfig-paths/register -r dotenv/config src/seeds/seed-admin.ts",
+    "seed:admin:prod": "node dist/src/seeds/seed-admin.js",
+    "db:reset-seed": "npm run db:reset && npm run seed:admin",
+    "db:reset-seed:prod": "npm run db:reset && npm run seed:admin:prod"
   },
   "dependencies": {
     "@clerk/backend": "^2.19.0",
