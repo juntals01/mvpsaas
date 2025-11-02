@@ -2,7 +2,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-// ---- ENV LOADER: dev uses .env if present; prod/managed relies on injected env ----
+// Load .env only in local dev (not in Railway/production)
 (function loadEnv() {
   const isManaged =
     !!process.env.RAILWAY_ENVIRONMENT ||
@@ -10,8 +10,7 @@ import * as path from 'path';
     !!process.env.RENDER ||
     !!process.env.VERCEL;
   const isProd = process.env.NODE_ENV === 'production';
-
-  if (isManaged || isProd) return; // <-- do nothing in prod
+  if (isManaged || isProd) return;
 
   try {
     const dotenv = require('dotenv') as typeof import('dotenv');
@@ -31,95 +30,65 @@ import * as path from 'path';
 
 import { clerkClient } from '@clerk/clerk-sdk-node';
 import { Logger } from '@nestjs/common';
-import { randomInt } from 'crypto';
 import dataSource from '../database/data-source';
 import { User, UserRole } from '../users/user.entity';
 
 const logger = new Logger('SeedAdmin');
 
+// --- Required envs (throw if missing) ---
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
 const ADMIN_NAME = process.env.ADMIN_NAME || 'Admin User';
 const ADMIN_IMAGE_URL = process.env.ADMIN_IMAGE_URL || '';
-const RESET_INTERVAL_MINUTES = Number(process.env.RESET_INTERVAL_MINUTES || 15);
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// Always rotate password (you can gate with env if you want)
-const ALWAYS_ROTATE_PASSWORD = true;
-
-/** Generate a strong random password */
-function generateStrongPassword(len = 28) {
-  const upp = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const low = 'abcdefghijkmnopqrstuvwxyz';
-  const num = '0123456789';
-  const sym = '!@#$%^&*()-_=+[]{};:,.<>?';
-  const all = upp + low + num + sym;
-
-  const pick = (set: string) => set[randomInt(0, set.length)];
-  const required = [pick(upp), pick(low), pick(num), pick(sym)];
-  const rest = Array.from({ length: Math.max(len - required.length, 0) }, () =>
-    pick(all),
-  );
-  const arr = [...required, ...rest];
-
-  // Fisher–Yates shuffle
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = randomInt(0, i + 1);
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr.join('');
+if (!process.env.CLERK_SECRET_KEY) {
+  throw new Error('CLERK_SECRET_KEY is required.');
+}
+if (!ADMIN_PASSWORD) {
+  throw new Error('ADMIN_PASSWORD is required.');
 }
 
-/** Create or update the Clerk admin user; always returns the active password */
-async function ensureClerkUserAndPassword(): Promise<{
-  clerkId: string;
-  password: string;
-}> {
-  if (!process.env.CLERK_SECRET_KEY) {
-    throw new Error('CLERK_SECRET_KEY is required to run this seeder.');
-  }
-
-  // Find by email
-  const list = await clerkClient.users.getUserList({
+async function ensureClerkAdmin(): Promise<{ clerkId: string }> {
+  // find by email
+  const list: any = await clerkClient.users.getUserList({
     emailAddress: [ADMIN_EMAIL],
   });
-  const existing = Array.isArray(list) ? list[0] : undefined;
+  const existing = Array.isArray(list)
+    ? list[0]
+    : Array.isArray(list?.data)
+      ? list.data[0]
+      : undefined;
 
-  const [firstName, ...restName] = ADMIN_NAME.split(' ').filter(Boolean);
-  const lastName = restName.join(' ') || undefined;
+  const [firstName, ...rest] = ADMIN_NAME.split(' ').filter(Boolean);
+  const lastName = rest.join(' ') || undefined;
 
-  // Helper to set profile fields (no-op for missing)
-  const baseProfile: Record<string, unknown> = {
+  const profile: Record<string, unknown> = {
     ...(firstName ? { firstName } : {}),
     ...(lastName ? { lastName } : {}),
     ...(ADMIN_IMAGE_URL ? { imageUrl: ADMIN_IMAGE_URL } : {}),
     publicMetadata: { role: 'admin' },
   };
 
-  // Always set a fresh strong password
-  const password = generateStrongPassword();
-
   if (existing) {
-    // Update profile + rotate password
     await clerkClient.users.updateUser(existing.id, {
-      ...baseProfile,
-      password, // server API can set a new password
+      ...profile,
+      password: ADMIN_PASSWORD,
     } as any);
-
-    logger.log(`Existing admin updated → Clerk ID: ${existing.id}`);
-    return { clerkId: existing.id, password };
+    logger.log(`Updated Clerk admin → ${existing.id}`);
+    return { clerkId: existing.id };
   }
 
-  // Create new user
   const created = await clerkClient.users.createUser({
     emailAddress: [ADMIN_EMAIL],
-    password,
-    ...baseProfile,
+    password: ADMIN_PASSWORD,
+    ...profile,
   } as any);
 
-  logger.warn('A new admin user has been created in Clerk.');
-  return { clerkId: created.id, password };
+  logger.log(`Created Clerk admin → ${created.id}`);
+  return { clerkId: created.id };
 }
 
-async function ensureDbUser(clerkId: string) {
+async function ensureDbAdmin(clerkId: string) {
   if (!dataSource.isInitialized) {
     await dataSource.initialize();
   }
@@ -151,29 +120,19 @@ async function ensureDbUser(clerkId: string) {
 
 (async () => {
   try {
-    logger.log('Starting admin seeder...');
-    logger.log(`Email: ${ADMIN_EMAIL}`);
-    logger.log(`Name : ${ADMIN_NAME}`);
+    logger.log(`Seeding admin… (${ADMIN_EMAIL})`);
+    const { clerkId } = await ensureClerkAdmin();
+    const dbUser = await ensureDbAdmin(clerkId);
 
-    const { clerkId, password } = await ensureClerkUserAndPassword();
-    const dbUser = await ensureDbUser(clerkId);
-
-    logger.log(`✅ Clerk user: ${clerkId}`);
-    logger.log(`✅ DB user   : ${dbUser.id} (role: ${dbUser.role})`);
-
-    // Always show the current password (you can gate on NODE_ENV if needed)
-    logger.warn(`⚠️  Admin password rotated. Save securely: ${password}`);
-
-    // Optional: set/reset your countdown marks server-side after seeding (if desired)
-    // e.g., write to your system_state table or call your /system/reset/mark with interval = RESET_INTERVAL_MINUTES
+    logger.log(`✅ Clerk: ${clerkId}`);
+    logger.log(`✅ DB   : ${dbUser.id} (role: ${dbUser.role})`);
+    logger.warn(`⚠️  Admin password set from ADMIN_PASSWORD env.`);
   } catch (err) {
-    logger.error('❌ Seed failed', err);
+    logger.error('❌ Seed failed', err as any);
     process.exitCode = 1;
   } finally {
     try {
-      if (dataSource.isInitialized) {
-        await dataSource.destroy();
-      }
+      if (dataSource.isInitialized) await dataSource.destroy();
     } catch {}
     process.exit();
   }
