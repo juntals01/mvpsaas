@@ -1,3 +1,4 @@
+// apps/web/src/components/ResetCountdownSSR.tsx
 'use client';
 import * as React from 'react';
 
@@ -25,13 +26,11 @@ function nextInterval(fromMs: number, minutes: number) {
 export function ResetCountdown({ initial }: Props) {
   const periodMs = initial.intervalMinutes * 60_000;
 
-  // Seed a target even if the API didn't give one
   const [target, setTarget] = React.useState<Date>(() =>
     initial.nextResetAt
       ? new Date(initial.nextResetAt)
       : nextInterval(initial.now, initial.intervalMinutes)
   );
-
   const [now, setNow] = React.useState<number>(initial.now);
 
   React.useEffect(() => {
@@ -39,10 +38,8 @@ export function ResetCountdown({ initial }: Props) {
       const t = Date.now();
       setNow(t);
 
-      // If we've reached/passed the target, roll it forward by whole periods
       if (t >= target.getTime()) {
         const n = new Date(target);
-        // advance by as many whole periods as needed to be in the future
         const diff = t - target.getTime();
         const steps = Math.floor(diff / periodMs) + 1;
         n.setTime(n.getTime() + steps * periodMs);
@@ -52,10 +49,7 @@ export function ResetCountdown({ initial }: Props) {
     return () => clearInterval(id);
   }, [periodMs, target]);
 
-  // Remaining time modulo the period, always positive
-  const rawRemaining = target.getTime() - now;
-  const remaining = rawRemaining <= 0 ? 0 : rawRemaining;
-
+  const remaining = Math.max(0, target.getTime() - now);
   const pct = Math.min(100, Math.max(0, 100 - (remaining / periodMs) * 100));
 
   const fmt = (ms: number) => {
@@ -74,30 +68,47 @@ export function ResetCountdown({ initial }: Props) {
   }).format(target);
 
   return (
-    <section className='mx-auto max-w-6xl px-6 pb-8'>
-      <div className='w-full max-w-sm rounded-2xl border bg-card p-4 shadow-sm'>
-        <div className='mb-2 text-sm text-muted-foreground'>
-          Database resets every {initial.intervalMinutes} minutes
+    <div className='relative'>
+      <div className='mb-3 flex items-center justify-between'>
+        <div className='text-sm text-muted-foreground'>
+          Database resets every{' '}
+          <span className='font-medium'>{initial.intervalMinutes} minutes</span>
         </div>
+        <div className='rounded-full border bg-white px-2.5 py-1 text-[10px] text-muted-foreground'>
+          Next: {nextDisplay}
+        </div>
+      </div>
+
+      <div className='rounded-xl border bg-background p-4'>
+        <div className='flex items-end justify-between gap-4'>
+          <div
+            className='text-4xl font-semibold tabular-nums'
+            aria-live='polite'
+          >
+            {fmt(remaining)}
+          </div>
+          <span className='text-xs text-muted-foreground'>mm:ss</span>
+        </div>
+
         <div
-          className='text-3xl font-semibold tabular-nums'
-          suppressHydrationWarning
+          className='mt-4 h-2 w-full rounded-full bg-muted'
+          role='progressbar'
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(pct)}
         >
-          {fmt(remaining)}
-        </div>
-        <div className='mt-3 h-2 w-full rounded-full bg-muted' aria-hidden>
           <div
             className='h-2 rounded-full bg-primary transition-[width] duration-300'
             style={{ width: `${pct}%` }}
           />
         </div>
+
         <div
-          className='mt-2 text-xs text-muted-foreground'
-          suppressHydrationWarning
-        >
-          Next reset at {nextDisplay}
-        </div>
+          className='pointer-events-none mt-3 h-2 w-full rounded-full bg-primary/10 blur-[6px]'
+          style={{ width: `${pct}%` }}
+          aria-hidden
+        />
       </div>
-    </section>
+    </div>
   );
 }
