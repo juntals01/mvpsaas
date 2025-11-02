@@ -3,36 +3,26 @@ import * as path from 'path';
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 
-/** Only load a .env file in *local dev*, never in managed/prod (Railway, Vercel, etc.) */
+// Only try .env files in local dev, never in prod/managed
 (() => {
   const isManaged =
     !!process.env.RAILWAY_ENVIRONMENT ||
     !!process.env.RAILWAY_STATIC_URL ||
     !!process.env.VERCEL ||
-    !!process.env.RENDER ||
-    process.env.NODE_ENV === 'production';
-
-  if (isManaged) return;
+    !!process.env.RENDER;
+  const isProd = process.env.NODE_ENV === 'production';
+  if (isManaged || isProd) return;
 
   try {
     const dotenv = require('dotenv') as typeof import('dotenv');
-    // Try a few likely locations; harmless if missing
-    const candidates = [
-      path.resolve(process.cwd(), '.env'),
-      path.resolve(process.cwd(), '../../.env'),
-      path.resolve(__dirname, '../../../../.env'),
-    ];
-    for (const p of candidates) {
-      try {
-        dotenv.config({ path: p });
-        break;
-      } catch {}
-    }
+    dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
   } catch {}
 })();
 
 function buildConfig() {
-  // Prefer DATABASE_URL in prod/managed (Railway injects this)
+  const ext = __filename.endsWith('.ts') ? 'ts' : 'js';
+
+  // Prefer DATABASE_URL on Railway
   const url = process.env.DATABASE_URL;
   if (url) {
     const ssl =
@@ -44,17 +34,14 @@ function buildConfig() {
       type: 'postgres' as const,
       url,
       ssl,
-      entities: [
-        // works in ts-node and compiled dist
-        path.join(__dirname, '..', '**', '*.entity.{ts,js}'),
-      ],
-      migrations: [path.join(__dirname, 'migrations', '*.{ts,js}')],
+      entities: [path.join(__dirname, '..', '**', `*.entity.${ext}`)],
+      migrations: [path.join(__dirname, 'migrations', `*.${ext}`)],
       synchronize: false,
       logging: process.env.TYPEORM_LOGGING === 'true',
     };
   }
 
-  // Local dev fallback (no Railway)
+  // Local fallback
   const {
     POSTGRES_HOST = '127.0.0.1',
     POSTGRES_PORT = '5433',
@@ -70,8 +57,8 @@ function buildConfig() {
     username: POSTGRES_USER,
     password: POSTGRES_PASSWORD,
     database: POSTGRES_DB,
-    entities: [path.join(__dirname, '..', '**', '*.entity.{ts,js}')],
-    migrations: [path.join(__dirname, 'migrations', '*.{ts,js}')],
+    entities: [path.join(__dirname, '..', '**', `*.entity.${ext}`)],
+    migrations: [path.join(__dirname, 'migrations', `*.${ext}`)],
     synchronize: false,
     logging: process.env.TYPEORM_LOGGING === 'true',
   };

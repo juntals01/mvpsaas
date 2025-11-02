@@ -1,32 +1,32 @@
 // apps/api/src/seeds/seed-admin.ts
-import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// ---- ENV LOADER: dev uses .env if present; prod relies on injected env ----
+// ---- ENV LOADER: dev uses .env if present; prod/managed relies on injected env ----
 (function loadEnv() {
-  const isManaged = !!(
-    process.env.RAILWAY_ENVIRONMENT ||
-    process.env.RAILWAY_STATIC_URL ||
-    process.env.RENDER ||
-    process.env.VERCEL
-  );
-  if (isManaged || process.env.NODE_ENV === 'production') {
-    dotenv.config(); // harmless if no file
-    return;
-  }
-  const candidates = [
-    path.resolve(process.cwd(), '.env'),
-    path.resolve(process.cwd(), '../../.env'),
-    path.resolve(__dirname, '../../../../.env'),
-    path.resolve(__dirname, '../../../../../.env'),
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) {
-      dotenv.config({ path: p });
-      break;
+  const isManaged =
+    !!process.env.RAILWAY_ENVIRONMENT ||
+    !!process.env.RAILWAY_STATIC_URL ||
+    !!process.env.RENDER ||
+    !!process.env.VERCEL;
+  const isProd = process.env.NODE_ENV === 'production';
+
+  if (isManaged || isProd) return; // <-- do nothing in prod
+
+  try {
+    const dotenv = require('dotenv') as typeof import('dotenv');
+    const candidates = [
+      path.resolve(process.cwd(), '.env'),
+      path.resolve(process.cwd(), '../../.env'),
+      path.resolve(__dirname, '../../../../.env'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        dotenv.config({ path: p });
+        break;
+      }
     }
-  }
+  } catch {}
 })();
 
 import { clerkClient } from '@clerk/clerk-sdk-node';
