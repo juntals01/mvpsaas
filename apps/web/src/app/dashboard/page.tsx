@@ -1,8 +1,10 @@
+// apps/web/src/app/dashboard/page.tsx
 import { META, SITE } from '@/constants/site';
 import { STYLES } from '@/constants/styles';
-import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { currentUser } from '@clerk/nextjs/server';
 import type { Metadata } from 'next';
 import Image from 'next/image';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -12,37 +14,42 @@ export const metadata: Metadata = {
   description: META.description,
 };
 
-const fmtDate = (v?: string | null) => (v ? new Date(v).toLocaleString() : '—');
+function fmtDate(v?: string | number | Date | null) {
+  return v
+    ? new Date(v).toLocaleString('en-US', { timeZone: 'Asia/Manila' })
+    : '—';
+}
 
-export default function Page() {
-  const { user, loading, error } = useCurrentUser();
-
-  if (loading) {
-    return (
-      <div className='min-h-screen flex items-center justify-center text-muted-foreground'>
-        Loading...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className='min-h-screen flex items-center justify-center text-destructive'>
-        {error}
-      </div>
-    );
-  }
+export default async function Page() {
+  const user = await currentUser();
 
   if (!user) {
-    return (
-      <div className='min-h-screen flex items-center justify-center text-muted-foreground'>
-        Not signed in
-      </div>
-    );
+    redirect('/sign-in?redirect_url=/dashboard');
   }
 
-  const { email, name, imageUrl, role, lastSignInAt, createdAt, updatedAt } =
-    user;
+  const imageUrl = user.imageUrl ?? '/avatar.png';
+  const name =
+    user.fullName ??
+    ([user.firstName, user.lastName].filter(Boolean).join(' ') || '—');
+
+  const email =
+    user.emailAddresses?.find((e) => e.id === user.primaryEmailAddressId)
+      ?.emailAddress ||
+    user.emailAddresses?.[0]?.emailAddress ||
+    '—';
+
+  // If you store app roles in publicMetadata or a DB, map it here:
+  const role =
+    (user.publicMetadata?.role as string | undefined) ||
+    (user.privateMetadata?.role as string | undefined) ||
+    '—';
+
+  const createdAt =
+    (user.createdAt as unknown as number | string | Date) ?? null;
+  const updatedAt =
+    (user.updatedAt as unknown as number | string | Date) ?? null;
+  const lastSignInAt =
+    (user.lastSignInAt as unknown as number | string | Date) ?? null;
 
   return (
     <main className='min-h-screen bg-background'>
@@ -51,17 +58,15 @@ export default function Page() {
       >
         <div className='w-full max-w-md bg-card shadow-sm border rounded-2xl p-6 flex flex-col items-center text-center space-y-4'>
           <Image
-            src={imageUrl || '/avatar.png'}
+            src={imageUrl}
             alt={name || 'User avatar'}
             width={96}
             height={96}
             className='rounded-full border object-cover'
           />
 
-          <h1 className='text-xl font-semibold text-foreground'>
-            {name ?? '—'}
-          </h1>
-          <p className='text-sm text-muted-foreground'>{email ?? '—'}</p>
+          <h1 className='text-xl font-semibold text-foreground'>{name}</h1>
+          <p className='text-sm text-muted-foreground'>{email}</p>
 
           <div className='w-full border-t my-4' />
 
@@ -69,7 +74,7 @@ export default function Page() {
             <div className='flex justify-between'>
               <span className='text-muted-foreground'>Role</span>
               <span className='font-medium text-foreground capitalize'>
-                {role ?? '—'}
+                {role}
               </span>
             </div>
             <div className='flex justify-between'>
