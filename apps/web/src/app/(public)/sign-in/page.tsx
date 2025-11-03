@@ -1,4 +1,3 @@
-// apps/web/src/app/sign-in/page.tsx
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -14,14 +13,7 @@ const SignInSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-// Narrow Clerk API-style errors without depending on Clerk helpers
-function isClerkAPIError(
-  err: unknown
-): err is { errors?: { longMessage?: string; message?: string }[] } {
-  return typeof err === 'object' && err !== null && 'errors' in err;
-}
-
-export default function SignInPage() {
+function SignInInner() {
   const router = useRouter();
   const sp = useSearchParams();
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -30,10 +22,8 @@ export default function SignInPage() {
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
-  // Early guard for runtime (also helps TS after we create non-null locals)
   if (!isLoaded || !signIn || !setActive) return null;
 
-  // Create non-null aliases so TS stops complaining
   const signInRes = signIn as NonNullable<typeof signIn>;
   const setActiveRes = setActive as NonNullable<typeof setActive>;
 
@@ -49,7 +39,6 @@ export default function SignInPage() {
 
     try {
       setLoading(true);
-
       const res = await signInRes.create({
         identifier: form.email,
         password: form.password,
@@ -71,15 +60,14 @@ export default function SignInPage() {
 
       setError('Sign-in requires additional steps. Please try again.');
     } catch (err: unknown) {
-      if (isClerkAPIError(err)) {
-        setError(
-          err.errors?.[0]?.longMessage ??
-            err.errors?.[0]?.message ??
-            'Sign-in failed'
-        );
-      } else {
-        setError('Sign-in failed');
-      }
+      const e = err as {
+        errors?: { longMessage?: string; message?: string }[];
+      };
+      const msg =
+        e?.errors?.[0]?.longMessage ??
+        e?.errors?.[0]?.message ??
+        'Sign-in failed';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -88,8 +76,8 @@ export default function SignInPage() {
   async function handleGoogleOAuth() {
     await signInRes.authenticateWithRedirect({
       strategy: 'oauth_google',
-      redirectUrl: '/sign-in', // returns here first
-      redirectUrlComplete: '/dashboard', // final destination on success
+      redirectUrl: '/sign-in',
+      redirectUrlComplete: '/dashboard',
     });
   }
 
@@ -150,11 +138,7 @@ export default function SignInPage() {
           className='w-full'
           onClick={handleGoogleOAuth}
         >
-          <svg
-            className='mr-2 h-4 w-4'
-            xmlns='http://www.w3.org/2000/svg'
-            viewBox='0 0 48 48'
-          >
+          <svg className='mr-2 h-4 w-4' viewBox='0 0 48 48'>
             <path
               fill='#EA4335'
               d='M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C36.04 2.92 30.47 0 24 0 14.64 0 6.44 5.37 2.56 13.14l7.99 6.19C12.27 13.13 17.67 9.5 24 9.5z'
@@ -183,5 +167,20 @@ export default function SignInPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+// Wrap the inner component in Suspense
+export default function SignInPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className='flex min-h-screen items-center justify-center'>
+          Loading…
+        </div>
+      }
+    >
+      <SignInInner />
+    </React.Suspense>
   );
 }

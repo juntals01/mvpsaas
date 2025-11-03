@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "dotenv -e ../../.env -- sh -c 'PORT=${WEB_PORT:-3000} next dev --turbopack'",
-    "build": "next build",
+    "build": "NODE_ENV=production dotenv -e ../../.env -- next build",
     "start": "next start -p ${PORT:-3000}",
     "start:local": "dotenv -e ../../.env -- sh -c 'PORT=${WEB_PORT:-3000} next start -p $PORT'",
     "lint": "next lint --max-warnings 0",
