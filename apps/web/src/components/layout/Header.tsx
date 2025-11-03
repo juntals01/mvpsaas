@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { NAV_LINKS, SITE } from '@/constants/site';
 import {
   SignedIn,
   SignedOut,
@@ -18,16 +19,26 @@ export function Header() {
         {/* Left: Logo */}
         <Link href='/' className='flex items-center gap-2'>
           <Image
-            src='/globe.svg'
-            alt='MVP Base'
-            width={32}
-            height={32}
-            className='rounded-lg'
+            src={SITE.logo}
+            alt={SITE.name}
+            width={128}
+            height={40}
+            className='h-10 w-auto rounded-lg'
           />
-          <span className='font-semibold text-lg tracking-tight text-gray-800'>
-            MVP Base
-          </span>
         </Link>
+
+        {/* Center: Navigation */}
+        <nav className='hidden md:flex items-center gap-8'>
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className='text-sm font-medium text-gray-700 hover:text-[#6c47ff]'
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
 
         {/* Right: Auth */}
         <div className='flex items-center gap-4'>
