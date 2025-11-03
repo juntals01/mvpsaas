@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { NAV_LINKS, SITE } from '@/constants/site';
+import { STYLES } from '@/constants/styles';
 import {
   SignedIn,
   SignedOut,
@@ -15,7 +16,9 @@ import Link from 'next/link';
 export function Header() {
   return (
     <header className='sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md'>
-      <div className='container mx-auto max-w-7xl flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8'>
+      <div
+        className={`${STYLES.container} flex items-center justify-between h-16`}
+      >
         {/* Left: Logo */}
         <Link href='/' className='flex items-center gap-2'>
           <Image

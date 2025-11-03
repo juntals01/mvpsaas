@@ -1,6 +1,6 @@
-// apps/web/src/app/pricing/page.tsx
 import { DemoCredentialsCard } from '@/components/DemoCredentialsCard';
 import { ResetCountdown } from '@/components/ResetCountdownSSR';
+import { STYLES } from '@/constants/styles';
 import { PricingTable } from '@clerk/nextjs';
 
 export const dynamic = 'force-dynamic';
@@ -51,14 +51,16 @@ export default async function Page() {
       {/* Hero */}
       <section className='relative overflow-hidden'>
         <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(35rem_35rem_at_50%_-10%,rgba(43,127,255,0.12),transparent)]' />
-        <div className='mx-auto max-w-6xl px-6 pt-16 pb-8 text-center'>
+        <div className={`${STYLES.container} text-center pt-16 pb-8`}>
           <span className='inline-flex items-center gap-2 rounded-full border bg-white/70 px-3 py-1 text-xs text-muted-foreground backdrop-blur'>
             Pricing powered by Clerk Billing
           </span>
-          <h1 className='mt-5 text-4xl font-semibold tracking-tight sm:text-5xl'>
+          <h1 className={`${STYLES.heading} mt-5`}>
             Simple, transparent pricing
           </h1>
-          <p className='mx-auto mt-3 max-w-2xl text-balance text-muted-foreground'>
+          <p
+            className={`${STYLES.subheading} mx-auto mt-3 max-w-2xl text-balance`}
+          >
             Configure plans in Clerk. We’ll handle checkout, trials, and
             subscriptions.
           </p>
@@ -66,12 +68,9 @@ export default async function Page() {
       </section>
 
       {/* Demo credentials + countdown */}
-      <section className='mx-auto max-w-6xl px-6 pb-10'>
+      <section className={`${STYLES.container} pb-10`}>
         <div className='grid gap-6 sm:grid-cols-2'>
-          {/* Credentials Card */}
           <DemoCredentialsCard minutes={mins} />
-
-          {/* Countdown Card */}
           <div className='rounded-2xl border bg-card/90 p-5 shadow-sm backdrop-blur'>
             <ResetCountdown
               initial={{
@@ -84,15 +83,13 @@ export default async function Page() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section className='mx-auto max-w-6xl px-6 pb-24'>
+      {/* Pricing Table */}
+      <section className={`${STYLES.container} pb-24`}>
         <div className='rounded-3xl border bg-card/90 p-4 sm:p-6 shadow-sm backdrop-blur'>
           <PricingTable
             appearance={{
               variables: { colorBackground: 'white', colorText: 'black' },
-              elements: {
-                rootBox: 'w-full',
-              },
+              elements: { rootBox: 'w-full' },
             }}
           />
         </div>
